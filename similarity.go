@@ -2,8 +2,8 @@ package gosbert
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
+	"runtime"
 
 	python3 "github.com/cel-edward/cpy3"
 )
@@ -59,12 +59,14 @@ func NewSbert() (s Sbert, err error) {
 		return s, fmt.Errorf("NewSbert: failed initialising python interpreter")
 	}
 
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return s, fmt.Errorf("NewSbert: failed finding runtime filepath")
+	}
+	dir, err := filepath.Abs(filepath.Dir(file)) // os.Args[0]
 	if err != nil {
 		return s, fmt.Errorf("NewSbert: %w", err)
 	}
-
-	fmt.Println(dir)
 
 	ret := python3.PyRun_SimpleString("import sys\nsys.path.append(\"" + dir + "\")")
 	if ret != 0 {
@@ -135,6 +137,7 @@ func (s Sbert) Similarity(target string, others []string) ([]float64, error) {
 		return nil, fmt.Errorf("similarity: failed creating args tuple")
 	}
 	defer args.DecRef()
+
 	ret := python3.PyTuple_SetItem(args, 0, pyTarget) //steals ref to pyTarget
 	if ret != 0 {
 		if python3.PyErr_Occurred() != nil {
@@ -144,6 +147,8 @@ func (s Sbert) Similarity(target string, others []string) ([]float64, error) {
 		pyTarget = nil
 		return nil, fmt.Errorf("similarity: failed setting args tuple item 0")
 	}
+	pyTarget = nil
+
 	ret = python3.PyTuple_SetItem(args, 1, pyOthers) //steals ref to pyOthers
 	if ret != 0 {
 		if python3.PyErr_Occurred() != nil {
