@@ -40,10 +40,9 @@ Then install dependencies (slimmed version of sentence-transformers)
 
 # Usage
 
-Tests must be compiled and run from the working directory where you would otherwise run your builds.
+Call `sbert, err := NewSbert()` followed by `defer sbert.Finalize()`.
 
-    go test -c && ./gosbert.test
-
+Initial start-up may be prolonged due to initalizing the language model.
 
 # References
 https://poweruser.blog/embedding-python-in-go-338c0399f3d5
