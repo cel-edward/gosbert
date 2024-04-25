@@ -1,3 +1,9 @@
+# SBERT Python functionality called from Go
+
+This library is designed to expose simple functionalities from the popular Python library sentence-transformers into Go, given the lack of local implementation.
+
+This is strongly a work-in-progress in very early developmental stages, and is not suitable for external use in its current form.c
+
 # Setup
 ## cpy3
 Must have Python 3.8 and associated headers (python3.8-dev) installed. On Ubuntu:
