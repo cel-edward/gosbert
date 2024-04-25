@@ -10,6 +10,8 @@ def lengths(data: list[str]) -> list[int]:
 
 
 def similarity(target:str, others: list[str]) -> list[float]:
+    """Returns the similarity of each item in others to target, ranging (approx) from 0-1
+    where higher means the strings are more similar."""
     sentence_model = _get_sentence_model()
     target_embedding = sentence_model.encode([target], normalize_embeddings=True)
     others_embedding = sentence_model.encode(others, normalize_embeddings=True)
@@ -17,6 +19,7 @@ def similarity(target:str, others: list[str]) -> list[float]:
     return similarity.tolist()[0]
 
 def _get_sentence_model(model_name: str = 'all-MiniLM-L6-v2'):
+    """Retrieves the sentence_model from the local hierarchy"""
     current_dir = os.path.dirname(os.path.realpath(__file__))
     path = os.path.join(current_dir, model_name)
     sentence_model = SentenceTransformer(path)
