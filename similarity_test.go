@@ -14,24 +14,37 @@ func TestNewSbert(t *testing.T) {
 	assert.NotNil(sbert.module)
 }
 
-// func Test() {
-// 	sbert, err := NewSbert()
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	defer sbert.Finalize()
+func TestGetSimilarity(t *testing.T) {
+	assert := assert.New(t)
 
-// 	similarity, err := sbert.Similarity(
-// 		"this is a test phrase",
-// 		[]string{
-// 			"this is a similar testing phrase",
-// 			"i am totally unrelated",
-// 			"i also have no relevance",
-// 		},
-// 	)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
+	sbert, err := NewSbert()
+	assert.NoError(err)
 
-// 	log.Print(similarity)
-// }
+	t.Run("identical", func(t *testing.T) {
+		got, err := sbert.GetSimilarity(
+			"I am a factual statement",
+			[]string{
+				"I am a factual statement",
+			},
+		)
+		assert.NoError(err)
+		assert.Len(got, 1)
+		assert.InDelta(1, got[0], 0.001)
+	})
+
+	t.Run("similarity", func(t *testing.T) {
+		got, err := sbert.GetSimilarity(
+			"I am a factual statement",
+			[]string{
+				"I am also a factual phrase",
+				"There is no relevance here",
+				"Nothing contained within has a similarity to above",
+			},
+		)
+		assert.NoError(err)
+		assert.Len(got, 3)
+		assert.Equal(true, got[0] > got[1])
+		assert.Equal(true, got[0] > got[2])
+	})
+
+}

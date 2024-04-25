@@ -8,51 +8,15 @@ import (
 	python3 "github.com/cel-edward/cpy3"
 )
 
-// func main() {
-
-// 	defer python3.Py_Finalize()
-// 	python3.Py_Initialize()
-// 	if !python3.Py_IsInitialized() {
-// 		log.Fatal("failed initialising python interpreter")
-// 	}
-
-// 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-
-// 	// we could also use PySys_GetObject("path") + PySys_SetPath,
-// 	//but this is easier (at the cost of less flexible error handling)
-// 	ret := python3.PyRun_SimpleString("import sys\nsys.path.append(\"" + dir + "\")")
-// 	if ret != 0 {
-// 		log.Fatalf("error appending '%s' to python sys.path", dir)
-// 	}
-
-// 	oImport := python3.PyImport_ImportModule("similarity") //ret val: new ref
-// 	if !(oImport != nil && python3.PyErr_Occurred() == nil) {
-// 		python3.PyErr_Print()
-// 		log.Fatal("failed to import module 'similarity'")
-// 	}
-
-// 	defer oImport.DecRef()
-
-// 	oModule := python3.PyImport_AddModule("similarity") //ret val: borrowed ref (from oImport)
-
-// 	if !(oModule != nil && python3.PyErr_Occurred() == nil) {
-// 		python3.PyErr_Print()
-// 		log.Fatal("failed to add module 'similarity'")
-// 	}
-
-// 	err = runPython(oModule)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// }
-
+// Sbert is the primary handler for module functionality
 type Sbert struct {
 	module *python3.PyObject
 }
 
+// NewSbert returns a new Sbert struct with initialised Python references,
+// returning an error if it fails to initalise correctly.
+//
+// IMPORTANT: you must call Finalize after NewSbert (defer is idiomatic) to avoid Python/C-API memory leaks
 func NewSbert() (s Sbert, err error) {
 	python3.Py_Initialize()
 	if !python3.Py_IsInitialized() {
@@ -93,26 +57,17 @@ func NewSbert() (s Sbert, err error) {
 	}, nil
 }
 
+// Finalize should be called once no Python functionality is required.
+// Idiomatically this would be with a defer call after NewSbert.
 func (s Sbert) Finalize() {
 	python3.Py_Finalize()
 }
 
-// func runPython(module *python3.PyObject) error {
-// 	s := "I am a test string"
-// 	ss := []string{
-// 		"I am also a testing string",
-// 		"there is nothing in common with what I say",
-// 		"equally nothing of equivalence here",
-// 	}
-// 	similarities, err := similarity(module, s, ss)
-// 	if err != nil {
-// 		return fmt.Errorf("runPython: %w", err)
-// 	}
-// 	fmt.Println(similarities)
-// 	return nil
-// }
-
-func (s Sbert) Similarity(target string, others []string) ([]float64, error) {
+// GetSimilarity returns a similarity metric for each item in others relative to target,
+// ranging (approx) from 0-1 where higher means the strings are semantically more similar.
+//
+// It is based on SBERT embedding of the strings following by a similarity comparison.
+func (s Sbert) GetSimilarity(target string, others []string) ([]float64, error) {
 
 	pyTarget := python3.PyUnicode_FromString(target) //retval: New reference, gets stolen later
 
@@ -188,6 +143,7 @@ func (s Sbert) Similarity(target string, others []string) ([]float64, error) {
 
 }
 
+// floatSliceFromPyList converts a Python list held in pylist to a Go slice of float64
 func floatSliceFromPyList(pylist *python3.PyObject) ([]float64, error) {
 	seq := pylist.GetIter() //ret val: New reference
 	if !(seq != nil && python3.PyErr_Occurred() == nil) {
@@ -258,75 +214,3 @@ func floatSliceFromPyList(pylist *python3.PyObject) ([]float64, error) {
 	}
 	return goList, nil
 }
-
-// func intSliceFromPyList(pylist *python3.PyObject) ([]int, error) {
-
-// 	seq := pylist.GetIter() //ret val: New reference
-// 	if !(seq != nil && python3.PyErr_Occurred() == nil) {
-// 		python3.PyErr_Print()
-// 		return nil, fmt.Errorf("intSliceFromPyList: failed creating iterator for list")
-// 	}
-// 	defer seq.DecRef()
-// 	tNext := seq.GetAttrString("__next__") //ret val: new ref
-// 	if !(tNext != nil && python3.PyCallable_Check(tNext)) {
-// 		return nil, fmt.Errorf("intSliceFromPyList: iterator has no __next__ function")
-// 	}
-// 	defer tNext.DecRef()
-
-// 	compare := python3.PyLong_FromGoInt(0)
-// 	if compare == nil {
-// 		return nil, fmt.Errorf("intSliceFromPyList: failed creating compare var")
-// 	}
-// 	defer compare.DecRef()
-
-// 	pyType := compare.Type() //ret val: new ref
-// 	if pyType == nil && python3.PyErr_Occurred() != nil {
-// 		python3.PyErr_Print()
-// 		return nil, fmt.Errorf("intSliceFromPyList: failed getting type of compare var")
-// 	}
-// 	defer pyType.DecRef()
-
-// 	pyListLen := pylist.Length()
-// 	if pyListLen == -1 {
-// 		return nil, fmt.Errorf("intSliceFromPyList: failed getting list length")
-// 	}
-
-// 	goList := make([]int, pyListLen)
-// 	for i := 0; i < pyListLen; i++ {
-// 		item := tNext.CallObject(nil) //ret val: new ref
-// 		if item == nil && python3.PyErr_Occurred() != nil {
-// 			python3.PyErr_Print()
-// 			return nil, fmt.Errorf("intSliceFromPyList: failed getting next item in sequence")
-// 		}
-// 		itemType := item.Type()
-// 		if itemType == nil && python3.PyErr_Occurred() != nil {
-// 			python3.PyErr_Print()
-// 			return nil, fmt.Errorf("intSliceFromPyList: failed getting item type")
-// 		}
-
-// 		defer itemType.DecRef()
-
-// 		if itemType != pyType {
-// 			if item != nil {
-// 				item.DecRef()
-// 			}
-// 			return nil, fmt.Errorf("intSliceFromPyList: wrong python item type")
-// 		}
-
-// 		itemGo := python3.PyLong_AsLong(item)
-// 		if itemGo != -1 && python3.PyErr_Occurred() == nil {
-// 			goList[i] = itemGo
-// 		} else {
-// 			if item != nil {
-// 				item.DecRef()
-// 			}
-// 			return nil, fmt.Errorf("intSliceFromPyList: failed casting python value")
-// 		}
-
-// 		if item != nil {
-// 			item.DecRef()
-// 			item = nil
-// 		}
-// 	}
-// 	return goList, nil
-// }
