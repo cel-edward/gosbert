@@ -2,7 +2,7 @@
 
 This library is designed to expose simple functionalities from the popular Python library sentence-transformers into Go, given the lack of local implementation.
 
-This is strongly a work-in-progress in very early developmental stages, and is not suitable for external use in its current form.c
+This is strongly a work-in-progress in very early developmental stages, and is not suitable for external use in its current form.
 
 # Setup
 ## cpy3
@@ -51,3 +51,4 @@ https://github.com/DataDog/go-python3/issues/38
 
 https://stackoverflow.com/questions/77205123/how-do-i-slim-down-sberts-sentencer-transformer-library
 
+https://www.datadoghq.com/blog/engineering/cgo-and-python/#the-dreadful-global-interpreter-lock

@@ -10,7 +10,8 @@ import (
 
 // Sbert is the primary handler for module functionality
 type Sbert struct {
-	module *python3.PyObject
+	module *python3.PyObject      // the main Python module to execute code from
+	state  *python3.PyThreadState // for GIL locking management
 }
 
 // NewSbert returns a new Sbert struct with initialised Python references,
@@ -52,14 +53,19 @@ func NewSbert() (s Sbert, err error) {
 		return s, fmt.Errorf("NewSbert: failed to add module 'similarity'")
 	}
 
+	// Initalize() locks GIL but need to release for goroutines. We then restore the state in Finalize()
+	state := python3.PyEval_SaveThread()
+
 	return Sbert{
 		module: oModule,
+		state:  state,
 	}, nil
 }
 
 // Finalize should be called once no Python functionality is required.
 // Idiomatically this would be with a defer call after NewSbert.
 func (s Sbert) Finalize() {
+	python3.PyEval_RestoreThread(s.state)
 	python3.Py_Finalize()
 }
 
@@ -68,6 +74,13 @@ func (s Sbert) Finalize() {
 //
 // It is based on SBERT embedding of the strings following by a similarity comparison.
 func (s Sbert) GetSimilarity(target string, others []string) ([]float64, error) {
+	// preventing random panics from go scheduler thread changes
+	// see https://www.datadoghq.com/blog/engineering/cgo-and-python/#the-dreadful-global-interpreter-lock
+	runtime.LockOSThread()
+
+	// critical for GIL management
+	gil := python3.PyGILState_Ensure()
+	defer python3.PyGILState_Release(gil)
 
 	pyTarget := python3.PyUnicode_FromString(target) //retval: New reference, gets stolen later
 
@@ -128,12 +141,14 @@ func (s Sbert) GetSimilarity(target string, others []string) ([]float64, error) 
 	if !(similarity != nil && python3.PyCallable_Check(similarity)) { //retval: Borrowed
 		return nil, fmt.Errorf("similarity: could not get function 'similarity', non-nil but callable is %t", python3.PyCallable_Check(similarity))
 	}
+
 	similarityDataPy := similarity.CallObject(args)
 	if !(similarityDataPy != nil && python3.PyErr_Occurred() == nil) { //retval: New reference
 		python3.PyErr_Print()
 		return nil, fmt.Errorf("similarity: failed calling function 'similarity'")
 	}
 	defer similarityDataPy.DecRef()
+
 	outliers, err := floatSliceFromPyList(similarityDataPy)
 	if err != nil {
 		return nil, fmt.Errorf("similarity: %s", err)
